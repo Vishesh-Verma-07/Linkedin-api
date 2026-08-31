@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "start:native": "node src/server-native.js",
     "dev": "node src/server.js",
     "login": "node scripts/login.js",
     "login:headless": "node scripts/login.js --headless"
