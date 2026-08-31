@@ -147,6 +147,11 @@ async function waitForCookies(context) {
   console.log("");
   console.log("You can now start the server with: npm start");
 
+  if (process.argv.includes("--print")) {
+    console.log(`\nLINKEDIN_LI_AT=${liAt}`);
+    console.log(`LINKEDIN_JSESSIONID=${jsessionId}`);
+  }
+
   await browser.close();
   rl.close();
 })();
