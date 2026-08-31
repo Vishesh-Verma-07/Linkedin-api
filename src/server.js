@@ -40,16 +40,16 @@ const limiter = rateLimit({
 app.use("/api/", limiter);
 
 if (!process.env.LINKEDIN_LI_AT || !process.env.LINKEDIN_JSESSIONID) {
-  console.error("Missing LINKEDIN_LI_AT or LINKEDIN_JSESSIONID environment variables");
-  process.exit(1);
+  console.warn("WARNING: LINKEDIN_LI_AT / LINKEDIN_JSESSIONID not set. API calls will trigger auto-login. Starting anyway...");
+} else {
+  Client({
+    li_at: process.env.LINKEDIN_LI_AT,
+    JSESSIONID: process.env.LINKEDIN_JSESSIONID.replace(/^ajax:/, ""),
+  });
 }
 
-let jsessionId = process.env.LINKEDIN_JSESSIONID.replace(/^ajax:/, "");
-
-Client({
-  li_at: process.env.LINKEDIN_LI_AT,
-  JSESSIONID: jsessionId,
-});
+let jsessionId = process.env.LINKEDIN_JSESSIONID ? process.env.LINKEDIN_JSESSIONID.replace(/^ajax:/, "") : "";
+let isInitialized = !!(process.env.LINKEDIN_LI_AT && process.env.LINKEDIN_JSESSIONID);
 
 let isRefreshing = false;
 let refreshQueue = [];
@@ -72,6 +72,7 @@ async function refreshSession() {
     process.env.LINKEDIN_LI_AT = newLiAt;
     process.env.LINKEDIN_JSESSIONID = newJsessionId;
     jsessionId = newJsessionId;
+    isInitialized = true;
 
     Client({ li_at: newLiAt, JSESSIONID: newJsessionId });
     console.log("Session refreshed successfully!");
@@ -246,6 +247,9 @@ app.get("/health", (req, res) => res.json({ status: "ok", timestamp: new Date().
 
 app.get("/api/me", async (req, res) => {
   try {
+    if (!isInitialized) {
+      await refreshSession();
+    }
     const profile = await getMe();
     res.json({ success: true, data: profile });
   } catch (error) {
@@ -273,6 +277,10 @@ app.get("/api/profile", async (req, res) => {
         error: "Missing required query parameter: url",
         example: "/api/profile?url=https://www.linkedin.com/in/username",
       });
+    }
+
+    if (!isInitialized) {
+      await refreshSession();
     }
 
     let identifier;
@@ -314,6 +322,10 @@ app.get("/api/profile/:id", async (req, res) => {
         error: "Missing profile identifier",
         example: "/api/profile/username",
       });
+    }
+
+    if (!isInitialized) {
+      await refreshSession();
     }
 
     const profileData = await fetchProfileData(id);
