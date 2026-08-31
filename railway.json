@@ -1,7 +1,7 @@
 {
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install"
+    "buildCommand": "npm install && npx patchright install chromium"
   },
   "deploy": {
     "startCommand": "npm start",

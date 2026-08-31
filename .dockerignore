@@ -4,3 +4,7 @@ npm-debug.log
 .git
 .gitignore
 README.md
+railway.json
+render.yaml
+deploy.ps1
+DEPLOY.md
