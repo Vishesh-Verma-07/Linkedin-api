@@ -61,7 +61,7 @@ Write-Host "Environment variables configured." -ForegroundColor Green
 # Test server locally
 Write-Host ""
 Write-Host "Testing server locally..." -ForegroundColor Yellow
-$server = Start-Process -NoNewWindow -FilePath "node" -ArgumentList "src/server.js" -PassThru
+$server = Start-Process -NoNewWindow -FilePath "node" -ArgumentList "src/index.js" -PassThru
 Start-Sleep -Seconds 2
 
 try {

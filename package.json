@@ -2,11 +2,10 @@
   "name": "linkedin-api",
   "version": "1.0.0",
   "description": "Reverse-engineered LinkedIn API - hosted profile scraper using Voyager endpoints",
-  "main": "src/server.js",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node src/server.js",
-    "start:native": "node src/server-native.js",
-    "dev": "node src/server.js",
+    "start": "node src/index.js",
+    "dev": "node src/index.js",
     "login": "node scripts/login.js",
     "login:headless": "node scripts/login.js --headless"
   },
