@@ -67,9 +67,12 @@ async function ensureBrowserInstalled(log = console.log) {
       try {
         execSync("npx patchright install-deps chromium", { stdio: "inherit", timeout: 300000 });
       } catch (depsErr) {
-        log("install-deps warning:", depsErr.message);
+        log("install-deps warning (system deps may be missing):", depsErr.message);
       }
     }
+    log("Browser install finished. Attempting launch...");
+    const browser = await chromium.launch({ headless: true });
+    await browser.close();
     return true;
   }
 }
