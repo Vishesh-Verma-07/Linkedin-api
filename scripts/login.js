@@ -1,4 +1,3 @@
-const { chromium } = require("patchright");
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
@@ -60,6 +59,7 @@ async function performLogin({ headless = false, log = console.log } = {}) {
   log("========================================");
   log("");
 
+  const { chromium } = require("patchright");
   const browser = await chromium.launch({ headless });
   const context = await browser.newContext();
   const page = await context.newPage();
