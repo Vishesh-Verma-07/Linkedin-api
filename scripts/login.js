@@ -50,17 +50,15 @@ async function waitForCookies(context) {
   return { liAt, jsessionId };
 }
 
-(async () => {
-  console.log("========================================");
-  console.log("  LinkedIn Session Login Helper");
-  console.log("========================================");
-  console.log("");
-
+async function performLogin({ headless = false, log = console.log } = {}) {
   const env = loadEnv();
   const email = process.env.LINKEDIN_EMAIL || env.LINKEDIN_EMAIL;
   const password = process.env.LINKEDIN_PASSWORD || env.LINKEDIN_PASSWORD;
 
-  const headless = process.argv.includes("--headless");
+  log("========================================");
+  log("  LinkedIn Session Login Helper");
+  log("========================================");
+  log("");
 
   const browser = await chromium.launch({ headless });
   const context = await browser.newContext();
@@ -69,11 +67,11 @@ async function waitForCookies(context) {
   await page.goto("https://www.linkedin.com/login");
 
   if (email && password) {
-    console.log("Credentials found in .env — logging in automatically...");
+    log("Credentials found — logging in automatically...");
     try {
       const emailInput = page.locator('input[type="email"]').last();
       const passInput = page.locator('input[type="password"]').last();
-      await emailInput.waitFor({ state: 'attached', timeout: 10000 });
+      await emailInput.waitFor({ state: "attached", timeout: 15000 });
       await page.waitForTimeout(1000);
       await emailInput.click();
       await emailInput.fill(email);
@@ -85,73 +83,69 @@ async function waitForCookies(context) {
 
       const currentUrl = page.url();
       if (currentUrl.includes("checkpoint") || currentUrl.includes("challenge") || currentUrl.includes("captcha")) {
-        console.log("");
-        console.log("LinkedIn is asking for verification (CAPTCHA / 2FA).");
-        console.log("Please complete it in the browser. The script will continue once you reach the feed.");
-        console.log("");
+        log("");
+        log("LinkedIn is asking for verification (CAPTCHA / 2FA).");
+        log(`Please complete it in the browser${headless ? " (headless - open in headed mode)" : ""}.`);
+        log("");
+        if (headless) {
+          await browser.close();
+          throw new Error("LinkedIn requires manual verification (CAPTCHA/2FA) which cannot be completed in headless mode.");
+        }
       } else {
-        console.log("Login form submitted. Waiting for redirect...");
+        log("Login form submitted. Waiting for redirect...");
       }
 
-      try {
-        await page.waitForURL("**/feed/**", { timeout: 300000 });
-        console.log("Logged in successfully!");
-      } catch {
-        console.log("Login timeout after 5 min. Please try again.");
-        await browser.close();
-        rl.close();
-        process.exit(1);
+      if (!headless) {
+        try {
+          await page.waitForURL("**/feed/**", { timeout: 300000 });
+          log("Logged in successfully!");
+        } catch {
+          await browser.close();
+          throw new Error("Login timeout after 5 min.");
+        }
+      } else {
+        await page.waitForURL("**/feed/**", { timeout: 60000 });
+        log("Logged in successfully!");
       }
     } catch (err) {
-      console.log("Auto-login failed (" + err.message + "), falling back to manual login...");
-      console.log("");
-      try {
-        await page.waitForURL("**/feed/**", { timeout: 300000 });
-      } catch {
-        console.log("Login timeout. Please try again.");
-        await browser.close();
-        rl.close();
-        process.exit(1);
-      }
+      await browser.close();
+      throw err;
     }
   } else {
-    console.log("No LINKEDIN_EMAIL / LINKEDIN_PASSWORD in .env — manual login.");
-    console.log("");
-    console.log("Tip: Add these to .env for automatic login:");
-    console.log("  LINKEDIN_EMAIL=your@email.com");
-    console.log("  LINKEDIN_PASSWORD=yourpassword");
-    console.log("");
-    console.log("Browser opened. Please log in to LinkedIn...");
-    try {
-      await page.waitForURL("https://www.linkedin.com/feed/", { timeout: 300000 });
-    } catch {
-      console.log("Login timeout. Please try again.");
-      await browser.close();
-      rl.close();
-      process.exit(1);
-    }
+    throw new Error("Missing LINKEDIN_EMAIL / LINKEDIN_PASSWORD environment variables.");
   }
 
   const { liAt, jsessionId } = await waitForCookies(context);
 
   if (!liAt || !jsessionId) {
-    console.error("ERROR: Could not find li_at or JSESSIONID cookies.");
     await browser.close();
-    rl.close();
-    process.exit(1);
+    throw new Error("Could not find li_at or JSESSIONID cookies.");
   }
 
-  console.log("✓ Cookies captured successfully!");
+  log("Cookies captured successfully!");
   saveCookies(liAt, jsessionId);
-  console.log("✓ Session saved to .env file!");
-  console.log("");
-  console.log("You can now start the server with: npm start");
-
-  if (process.argv.includes("--print")) {
-    console.log(`\nLINKEDIN_LI_AT=${liAt}`);
-    console.log(`LINKEDIN_JSESSIONID=${jsessionId}`);
-  }
-
   await browser.close();
-  rl.close();
-})();
+
+  return { liAt, jsessionId: jsessionId.replace(/^ajax:/, "") };
+}
+
+if (require.main === module) {
+  (async () => {
+    const headless = process.argv.includes("--headless");
+    try {
+      const { liAt, jsessionId } = await performLogin({ headless });
+      console.log("Session saved to .env file!");
+      if (process.argv.includes("--print")) {
+        console.log(`LINKEDIN_LI_AT=${liAt}`);
+        console.log(`LINKEDIN_JSESSIONID=${jsessionId}`);
+      }
+    } catch (err) {
+      console.error("Error:", err.message);
+      process.exit(1);
+    } finally {
+      rl.close();
+    }
+  })();
+}
+
+module.exports = { performLogin };

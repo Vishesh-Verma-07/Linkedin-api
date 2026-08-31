@@ -3,9 +3,8 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const { execFile } = require("child_process");
-const fs = require("fs");
 const path = require("path");
+const { performLogin } = require("../scripts/login");
 const {
   Client,
   extractProfileIdLinkedin,
@@ -63,35 +62,8 @@ async function refreshSession() {
   console.log("Session expired. Re-authenticating...");
 
   try {
-    const stdout = await new Promise((resolve, reject) => {
-      execFile(
-        "node",
-        [path.join(__dirname, "..", "scripts", "login.js"), "--headless", "--print"],
-        { timeout: 180000 },
-        (err, stdout, stderr) => {
-          if (err) return reject(new Error(`headless login exited with error: ${(stderr || err.message).trim()}`));
-          resolve(stdout);
-        }
-      );
-    });
-
-    const parseEnvLine = (text, key) => {
-      const re = new RegExp(`^${key}=([^\\r\\n]+)`, "m");
-      const m = text.match(re);
-      return m ? m[1].trim().replace(/^["']|["']$/g, "") : "";
-    };
-
-    let newLiAt = parseEnvLine(stdout, "LINKEDIN_LI_AT");
-    let newJsessionId = parseEnvLine(stdout, "LINKEDIN_JSESSIONID");
-
-    const envPath = path.join(__dirname, "..", ".env");
-    if ((!newLiAt || !newJsessionId) && fs.existsSync(envPath)) {
-      const envContent = fs.readFileSync(envPath, "utf8");
-      if (!newLiAt) newLiAt = parseEnvLine(envContent, "LINKEDIN_LI_AT");
-      if (!newJsessionId) newJsessionId = parseEnvLine(envContent, "LINKEDIN_JSESSIONID");
-    }
-
-    newJsessionId = newJsessionId.replace(/^ajax:/, "");
+    const { liAt, jsessionId: newJsessionId } = await performLogin({ headless: true });
+    const newLiAt = liAt;
 
     if (!newLiAt || !newJsessionId) {
       throw new Error("Re-authentication did not produce valid cookies");
