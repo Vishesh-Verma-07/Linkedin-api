@@ -3,7 +3,7 @@ services:
     name: linkedin-api
     runtime: node
     plan: free
-    buildCommand: npm install && npx patchright install chromium && npx patchright install-deps chromium
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: NODE_ENV
