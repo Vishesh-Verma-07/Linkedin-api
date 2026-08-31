@@ -51,7 +51,7 @@ Railway offers a free tier with automatic HTTPS.
    - Set:
      - **Name**: `linkedin-api`
      - **Environment**: `Node`
-     - **Build Command**: `npm install && npx patchright install chromium`
+     - **Build Command**: `npm install && npx patchright install chromium && npx patchright install-deps chromium`
      - **Start Command**: `npm start`
 
 3. **Set environment variables**

@@ -49,6 +49,31 @@ async function waitForCookies(context) {
   return { liAt, jsessionId };
 }
 
+async function ensureBrowserInstalled(log = console.log) {
+  const { chromium } = require("patchright");
+  try {
+    const browser = await chromium.launch({ headless: true });
+    await browser.close();
+    return true;
+  } catch (e) {
+    log("Chromium missing/unusable. Installing browser (this can take a minute)...");
+    const { execSync } = require("child_process");
+    try {
+      execSync("npx patchright install chromium", { stdio: "inherit", timeout: 300000 });
+    } catch (installErr) {
+      log("install chromium warning:", installErr.message);
+    }
+    if (process.platform === "linux") {
+      try {
+        execSync("npx patchright install-deps chromium", { stdio: "inherit", timeout: 300000 });
+      } catch (depsErr) {
+        log("install-deps warning:", depsErr.message);
+      }
+    }
+    return true;
+  }
+}
+
 async function performLogin({ headless = false, log = console.log } = {}) {
   const env = loadEnv();
   const email = process.env.LINKEDIN_EMAIL || env.LINKEDIN_EMAIL;
@@ -60,6 +85,7 @@ async function performLogin({ headless = false, log = console.log } = {}) {
   log("");
 
   const { chromium } = require("patchright");
+  await ensureBrowserInstalled(log);
   const browser = await chromium.launch({ headless });
   const context = await browser.newContext();
   const page = await context.newPage();
