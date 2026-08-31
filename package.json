@@ -1,0 +1,36 @@
+{
+  "name": "linkedin-api",
+  "version": "1.0.0",
+  "description": "Reverse-engineered LinkedIn API - hosted profile scraper using Voyager endpoints",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "login": "node scripts/login.js",
+    "login:headless": "node scripts/login.js --headless"
+  },
+  "keywords": [
+    "linkedin",
+    "api",
+    "voyager",
+    "scraper",
+    "profile"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@florydev/linkedin-api-voyager": "^1.5.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.1.0"
+  },
+  "devDependencies": {
+    "patchright": "^1.62.2",
+    "playwright": "^1.62.1"
+  }
+}

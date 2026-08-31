@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LinkedIn API - Local Tester</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #e5e5e5; padding: 40px 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 2rem; margin-bottom: 10px; background: linear-gradient(135deg, #0a66c2, #0077b5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+    .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 1.1rem; color: #0a66c2; margin-bottom: 12px; }
+    .endpoint { background: #0d0d0d; border: 1px solid #333; border-radius: 8px; padding: 12px 16px; margin: 8px 0; font-family: 'Courier New', monospace; font-size: 0.9rem; }
+    .method { color: #4ade80; font-weight: bold; }
+    .url { color: #e5e5e5; }
+    .input-group { display: flex; gap: 10px; margin-top: 12px; }
+    input[type="text"] { flex: 1; background: #0d0d0d; border: 1px solid #333; border-radius: 8px; padding: 10px 14px; color: #e5e5e5; font-size: 0.95rem; }
+    input[type="text"]:focus { outline: none; border-color: #0a66c2; }
+    button { background: #0a66c2; color: white; border: none; border-radius: 8px; padding: 10px 20px; font-size: 0.95rem; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #0077b5; }
+    button:disabled { background: #444; cursor: not-allowed; }
+    .response { background: #0d0d0d; border: 1px solid #333; border-radius: 8px; padding: 16px; margin-top: 16px; font-family: 'Courier New', monospace; font-size: 0.85rem; white-space: pre-wrap; word-break: break-all; max-height: 500px; overflow-y: auto; }
+    .error { color: #f87171; }
+    .success { color: #4ade80; }
+    .info { color: #fbbf24; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>LinkedIn API</h1>
+    <p class="subtitle">Reverse-engineered profile scraper - Local testing interface</p>
+
+    <div class="card">
+      <h2>Test Profile by URL</h2>
+      <div class="input-group">
+        <input type="text" id="profileUrl" placeholder="https://www.linkedin.com/in/username" value="https://www.linkedin.com/in/hrichasharma/">
+        <button onclick="testProfile()">Fetch</button>
+      </div>
+      <div id="profileResponse" class="response hidden"></div>
+    </div>
+
+    <div class="card">
+      <h2>Available Endpoints</h2>
+      <div class="endpoint"><span class="method">GET</span> <span class="url">/health</span></div>
+      <div class="endpoint"><span class="method">GET</span> <span class="url">/api/me</span></div>
+      <div class="endpoint"><span class="method">GET</span> <span class="url">/api/profile?url=&lt;linkedin-url&gt;</span></div>
+      <div class="endpoint"><span class="method">GET</span> <span class="url">/api/profile/:id</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Quick Test</h2>
+      <p style="color: #888; margin-bottom: 12px;">Click to test with a known profile:</p>
+      <button onclick="quickTest('satyanadella')">Test: satyanadella</button>
+      <button onclick="quickTest('hrichasharma')" style="margin-left: 8px;">Test: hrichasharma</button>
+      <div id="quickResponse" class="response hidden"></div>
+    </div>
+  </div>
+
+  <script>
+    const BASE = window.location.origin;
+
+    async function testProfile() {
+      const url = document.getElementById('profileUrl').value.trim();
+      const responseDiv = document.getElementById('profileResponse');
+      responseDiv.classList.remove('hidden');
+      responseDiv.innerHTML = '<span class="info">Loading...</span>';
+
+      try {
+        const res = await fetch(`/api/profile?url=${encodeURIComponent(url)}`);
+        const data = await res.json();
+        if (data.success) {
+          responseDiv.innerHTML = `<span class="success">✓ Success</span>\n\n${JSON.stringify(data.profile, null, 2)}`;
+        } else {
+          responseDiv.innerHTML = `<span class="error">✗ Error: ${data.error}</span>\n${data.message || ''}`;
+        }
+      } catch (err) {
+        responseDiv.innerHTML = `<span class="error">✗ Failed: ${err.message}</span>`;
+      }
+    }
+
+    async function quickTest(id) {
+      const responseDiv = document.getElementById('quickResponse');
+      responseDiv.classList.remove('hidden');
+      responseDiv.innerHTML = '<span class="info">Loading...</span>';
+
+      try {
+        const res = await fetch(`/api/profile/${encodeURIComponent(id)}`);
+        const data = await res.json();
+        if (data.success) {
+          const p = data.profile;
+          responseDiv.innerHTML = `<span class="success">✓ Fetched: ${p.name.fullName}</span>\n\n${JSON.stringify(data, null, 2)}`;
+        } else {
+          responseDiv.innerHTML = `<span class="error">✗ Error: ${data.error}</span>\n${data.message || ''}`;
+        }
+      } catch (err) {
+        responseDiv.innerHTML = `<span class="error">✗ Failed: ${err.message}</span>`;
+      }
+    }
+
+    document.getElementById('profileUrl').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') testProfile();
+    });
+  </script>
+</body>
+</html>
