@@ -22,7 +22,6 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@florydev/linkedin-api-voyager": "^1.5.1",
     "axios": "^1.7.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -30,8 +29,5 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.1.0",
     "patchright": "^1.62.2"
-  },
-  "devDependencies": {
-    "playwright": "^1.62.1"
   }
 }
