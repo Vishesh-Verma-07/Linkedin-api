@@ -12,14 +12,25 @@ function extractText(field) {
   return "";
 }
 
-function buildImageUrl(container) {
+function buildImageUrl(container, field) {
   if (!container || typeof container !== "object") return null;
-  const paths = [
-    "profilePicture.displayImageReference.vectorImage",
-    "profilePicture.displayImage",
-    "backgroundPicture.displayImageReference.vectorImage",
-    "backgroundPicture.displayImage",
-  ];
+  const paths = field
+    ? [
+        `${field}.displayImageReference.vectorImage`,
+        `${field}.displayImage`,
+        "displayImageReference.vectorImage",
+        "displayImage",
+        "vectorImage",
+      ]
+    : [
+        "profilePicture.displayImageReference.vectorImage",
+        "profilePicture.displayImage",
+        "backgroundPicture.displayImageReference.vectorImage",
+        "backgroundPicture.displayImage",
+        "displayImageReference.vectorImage",
+        "displayImage",
+        "vectorImage",
+      ];
   for (const path of paths) {
     const parts = path.split(".");
     let obj = container;
@@ -33,6 +44,13 @@ function buildImageUrl(container) {
         .sort((a, b) => (b?.width || 0) - (a?.width || 0))[0];
       return artifact ? `${obj.rootUrl}${artifact.fileIdentifyingUrlPathSegment}` : null;
     }
+  }
+  if (container?.displayImageReference?.vectorImage?.rootUrl) {
+    const v = container.displayImageReference.vectorImage;
+    const artifact = (v.artifacts || [])
+      .slice()
+      .sort((a, b) => (b?.width || 0) - (a?.width || 0))[0];
+    return artifact ? `${v.rootUrl}${artifact.fileIdentifyingUrlPathSegment}` : null;
   }
   return null;
 }
