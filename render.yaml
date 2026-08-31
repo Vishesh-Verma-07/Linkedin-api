@@ -3,11 +3,15 @@ services:
     name: linkedin-api
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install && npx patchright install chromium
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
+      - key: LINKEDIN_EMAIL
+        sync: false
+      - key: LINKEDIN_PASSWORD
+        sync: false
       - key: LINKEDIN_LI_AT
         sync: false
       - key: LINKEDIN_JSESSIONID

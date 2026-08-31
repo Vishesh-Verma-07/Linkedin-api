@@ -51,12 +51,14 @@ Railway offers a free tier with automatic HTTPS.
    - Set:
      - **Name**: `linkedin-api`
      - **Environment**: `Node`
-     - **Build Command**: `npm install`
+     - **Build Command**: `npm install && npx patchright install chromium`
      - **Start Command**: `npm start`
 
 3. **Set environment variables**
-   In Render dashboard → your service → Environment:
+   In Render dashboard → your service → Environment (all four are required for auto-refresh to work):
    ```
+   LINKEDIN_EMAIL=your_linkedin_email
+   LINKEDIN_PASSWORD=your_linkedin_password
    LINKEDIN_LI_AT=your_li_at_cookie
    LINKEDIN_JSESSIONID=your_jsessionid_cookie
    NODE_ENV=production
