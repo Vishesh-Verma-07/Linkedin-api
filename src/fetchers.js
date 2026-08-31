@@ -98,6 +98,99 @@ async function fetchRawProfile(identifier) {
   }
 }
 
+const CONTACT_QUERY_ID = "voyagerIdentityDashProfiles.c7452e58fa37646d09dae4920fc5b4b9";
+const PROFILE_ABOUT_QUERY_ID = "voyagerIdentityDashProfileCards.55af784c21dc8640b500ab5b45937064";
+const EMPTY_CONTACT = {
+  address: null,
+  weChatContactInfo: null,
+  phoneNumbers: null,
+  emailAddress: null,
+  websites: null,
+  twitterHandles: null,
+  birthDate: null,
+  ims: null,
+};
+
+function pickContact(entry) {
+  if (!entry || typeof entry !== "object") return { ...EMPTY_CONTACT };
+  const pick = (k) => entry[k] ?? null;
+  return {
+    address: extractText(entry.address || entry.locationName || entry.multiLocaleAddress) || null,
+    weChatContactInfo: pick("weChatContactInfo"),
+    phoneNumbers: pick("phoneNumbers")?.map?.((p) => p?.phoneNumber?.number) ?? null,
+    emailAddress: typeof pick("emailAddress") === "object" ? pick("emailAddress")?.emailAddress ?? null : pick("emailAddress"),
+    websites: pick("websites")?.map?.((w) => ({ label: w?.label, url: w?.url })) ?? null,
+    twitterHandles: pick("twitterHandles"),
+    birthDate: pick("birthDate") ?? pick("birthDateOn"),
+    ims: pick("ims"),
+  };
+}
+
+async function fetchContactInfo(identifier) {
+  const client = getClient();
+  try {
+    const endpoint = `/voyager/api/identity/dash/profiles?q=memberIdentity&memberIdentity=${encodeURIComponent(identifier)}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-93`;
+    const raw = await client.get(endpoint);
+    const included = Array.isArray(raw?.data?.included) ? raw.data.included : [];
+    const entry =
+      included.find((i) => i.entityUrn === `urn:li:fsd_profile:${identifier}`) ||
+      included.find((i) => i.$type?.includes("Profile") && i.publicIdentifier === identifier) ||
+      included[0];
+
+    const contact = pickContact(entry);
+    const hasAny = Object.values(contact).some(
+      (x) => x !== null && !(Array.isArray(x) && x.length === 0)
+    );
+    if (hasAny) return contact;
+
+    const gql = await client.get(
+      `/voyager/api/graphql?includeWebMetadata=true&variables=(memberIdentity:${encodeURIComponent(identifier)})&queryId=${CONTACT_QUERY_ID}`
+    );
+    const inc = Array.isArray(gql?.data?.included) ? gql.data.included : [];
+    const d = inc.find((i) => i?.entityUrn === `urn:li:fsd_profile:${identifier}`);
+    return d ? pickContact(d) : { ...EMPTY_CONTACT };
+  } catch (err) {
+    console.error("fetchContactInfo error:", err.message);
+    if (isAuthError(err)) {
+      throw new Error(`LinkedIn authentication required (HTTP 302) -> ${err.response?.headers?.location || "redirect"}`);
+    }
+    return { ...EMPTY_CONTACT };
+  }
+}
+
+async function fetchAboutSection(identifier) {
+  const client = getClient();
+  try {
+    const endpoint = `/voyager/api/identity/dash/profiles?q=memberIdentity&memberIdentity=${encodeURIComponent(identifier)}&decorationId=com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-93`;
+    const raw = await client.get(endpoint);
+    const included = Array.isArray(raw?.data?.included) ? raw.data.included : [];
+    const entry =
+      included.find((i) => i.entityUrn === `urn:li:fsd_profile:${identifier}`) ||
+      included.find((i) => i.$type?.includes("Profile") && i.publicIdentifier === identifier) ||
+      included[0];
+
+    const summary = extractText(entry?.summary || entry?.multiLocaleSummary);
+    if (summary) return summary;
+
+    const gql = await client.get(
+      `/voyager/api/graphql?variables=(profileUrn:urn%3Ali%3Afsd_profile%3A${identifier})&queryId=${PROFILE_ABOUT_QUERY_ID}`
+    );
+    for (const item of (gql?.data?.included) || []) {
+      for (const c of item?.topComponents || []) {
+        const t = c?.components?.textComponent?.text?.text;
+        if (typeof t === "string" && t.trim()) return t;
+      }
+    }
+    return null;
+  } catch (err) {
+    console.error("fetchAboutSection error:", err.message);
+    if (isAuthError(err)) {
+      throw new Error(`LinkedIn authentication required (HTTP 302) -> ${err.response?.headers?.location || "redirect"}`);
+    }
+    return null;
+  }
+}
+
 async function fetchSection(profileId, starredKey, mapper) {
   const client = getClient();
   try {
@@ -126,8 +219,10 @@ async function fetchSection(profileId, starredKey, mapper) {
 }
 
 async function fetchProfileData(identifier) {
-  const [raw, experiences, education, skills, certifications, languages] = await Promise.allSettled([
+  const [raw, about, contactInfo, experiences, education, skills, certifications, languages] = await Promise.allSettled([
     fetchRawProfile(identifier),
+    fetchAboutSection(identifier),
+    fetchContactInfo(identifier),
     fetchSection(identifier, "profilePositionGroups", (grp) => {
       const nestedCol = grp["*profilePositionInPositionGroup"];
       const positions = nestedCol
@@ -147,7 +242,7 @@ async function fetchProfileData(identifier) {
     fetchSection(identifier, "profileLanguages", mapLanguage),
   ]);
 
-  const results = [raw, experiences, education, skills, certifications, languages];
+  const results = [raw, about, contactInfo, experiences, education, skills, certifications, languages];
   for (const r of results) {
     if (r.status === "rejected" && isAuthError(r.reason)) {
       throw r.reason;
@@ -156,6 +251,8 @@ async function fetchProfileData(identifier) {
 
   const data = raw.status === "fulfilled" ? raw.value : {};
 
+  if (about.status === "fulfilled") data.about = about.value && about.value !== "N/A" ? about.value : null;
+  if (contactInfo.status === "fulfilled") data.contactInfo = contactInfo.value || {};
   if (experiences.status === "fulfilled") data.experiences = experiences.value || [];
   if (education.status === "fulfilled") data.education = education.value || [];
   if (skills.status === "fulfilled") data.skills = skills.value || [];
@@ -176,7 +273,7 @@ function buildResponse(data, identifier) {
       headline: data.headline,
       location: data.location,
       countryCode: data.countryCode,
-      about: data.summary,
+      about: data.about,
       summary: data.summary,
       occupation: data.occupation,
       avatarUrl: data.profilePicture,
@@ -188,7 +285,7 @@ function buildResponse(data, identifier) {
       skills: data.skills || [],
       certifications: data.certifications || [],
       languages: data.languages || [],
-      contactInfo: {},
+      contactInfo: data.contactInfo || {},
     },
     meta: {
       fetchedAt: new Date().toISOString(),
@@ -228,4 +325,4 @@ async function getMe() {
   };
 }
 
-module.exports = { fetchRawProfile, fetchSection, fetchProfileData, buildResponse, getMe, mapSkill, mapEducation, mapCertification, mapLanguage, mapPosition };
+module.exports = { fetchRawProfile, fetchSection, fetchAboutSection, fetchContactInfo, fetchProfileData, buildResponse, getMe, mapSkill, mapEducation, mapCertification, mapLanguage, mapPosition };
