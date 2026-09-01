@@ -1,224 +1,263 @@
-# LinkedIn API - Reverse Engineered Profile Scraper
+# LinkedIn Profile Scraper API
 
-A hosted REST API that accepts a LinkedIn profile URL and returns structured JSON with profile information. Built by reverse-engineering LinkedIn's internal Voyager API.
+A REST API that accepts a LinkedIn profile URL and returns structured JSON data. Built by reverse-engineering LinkedIn's internal Voyager API — no browser automation or Puppeteer needed for requests.
+
+**[Video Demo](https://drive.google.com/drive/folders/1W8QWRfgvCezrwW4T0W6s7MkyfSodIHsg?usp=drive_link)**
+
+## How It Works
+
+```
+Client  --->  Express Server  --->  LinkedIn Voyager API
+  ^              |                        |
+  |              v                        v
+  +---- JSON ----+--- Axios + Cookies ----+
+```
+
+1. On startup, the server loads your LinkedIn session cookies (`li_at` and `JSESSIONID`) from environment variables and creates an authenticated Axios client that mimics LinkedIn's web app headers.
+2. When a profile request arrives, the server hits LinkedIn's internal `/voyager/api/identity/dash/profiles` endpoint with the target's public identifier.
+3. The raw Voyager response is parsed and normalized into a clean JSON structure — extracting name, headline, experience, education, skills, certifications, contact info, and more from the deeply nested response.
+4. If the session expires (HTTP 302), the server automatically re-authenticates using saved credentials and retries the request.
 
 ## Features
 
-- **No browser required** - directly hits LinkedIn Voyager endpoints
-- **Comprehensive data** - name, headline, location, about, experience, education, skills, certifications, languages, contact info, and profile images
-- **Simple REST API** - GET requests with clean JSON responses
-- **Rate limited** - built-in protection to avoid account restrictions
-- **Production ready** - designed for deployment on Railway, Render, Fly.io, or any Node.js host
+- **No browser per request** — direct HTTP calls to Voyager API
+- **Comprehensive data** — name, headline, location, about, experience, education, skills, certifications, languages, projects, patents, publications, honors, courses, volunteer work, test scores, organizations, contact info, and profile images
+- **Auto session refresh** — re-authenticates automatically when cookies expire
+- **Rate limited** — 20 requests/minute built-in
+- **Production ready** — Docker support, Railway/Render/Fly.io configs included
 
-## Quick Start
+## Project Structure
 
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```
+linkedin-api/
+├── src/
+│   ├── index.js          # Entry point — Express app setup
+│   ├── middleware.js      # Helmet, CORS, rate limiting
+│   ├── routes.js         # API route definitions
+│   ├── client.js         # Axios client + session management
+│   ├── fetchers.js       # Voyager API calls + response parsing
+│   └── utils/
+│       └── parse.js      # Text extraction, image URL building, date parsing
+├── scripts/
+│   └── login.js          # Browser-based login helper (saves cookies to .env)
+├── public/
+│   └── index.html        # Landing page served at root
+├── Dockerfile            # Docker build config
+├── railway.json          # Railway deployment config
+├── render.yaml           # Render deployment config
+└── deploy.ps1            # PowerShell deployment helper
+```
 
-2. **Get LinkedIn credentials**
+## Setup
 
-   Option A - Login helper (uses stealth browser):
-   ```bash
-   npm run login
-   ```
+### Prerequisites
 
-   Option B - Manual (most reliable):
-   1. Open LinkedIn in your browser and log in
-   2. Press `F12` → Application → Cookies → `https://www.linkedin.com`
-   3. Copy the values for `li_at` and `JSESSIONID`
-   4. Create `.env` file:
-      ```
-      LINKEDIN_LI_AT=your_li_at_value
-      LINKEDIN_JSESSIONID=your_jsessionid_value
-      ```
+- Node.js >= 18
+- A LinkedIn account
 
-3. **Start the server**
-   ```bash
-   npm start
-   ```
+### 1. Install dependencies
 
-4. **Test the API**
-   ```bash
-   curl "http://localhost:3000/api/profile?url=https://www.linkedin.com/in/satyanadella"
-   ```
+```bash
+npm install
+```
+
+### 2. Get LinkedIn credentials
+
+**Option A — Automatic (recommended):**
+
+Set your LinkedIn email and password, then run the login helper:
+
+```bash
+# Set credentials in .env or as environment variables
+export LINKEDIN_EMAIL=your_email
+export LINKEDIN_PASSWORD=your_password
+
+npm run login
+```
+
+This opens a browser, logs in, captures session cookies, and saves them to `.env`.
+
+**Option B — Manual:**
+
+1. Log in to LinkedIn in your browser
+2. Press `F12` → Application → Cookies → `https://www.linkedin.com`
+3. Copy the `li_at` and `JSESSIONID` values
+4. Create a `.env` file:
+
+```
+LINKEDIN_LI_AT=your_li_at_value
+LINKEDIN_JSESSIONID=your_jsessionid_value
+```
+
+### 3. Start the server
+
+```bash
+npm start
+```
+
+### 4. Test it
+
+```bash
+curl "http://localhost:3000/api/profile?url=https://www.linkedin.com/in/satyanadella"
+```
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `LINKEDIN_LI_AT` | LinkedIn session cookie (`li_at`) - auto-filled by login script |
-| `LINKEDIN_JSESSIONID` | LinkedIn session cookie (`JSESSIONID`) - auto-filled by login script |
-| `PORT` | Server port (default: 3000) |
-| `NODE_ENV` | Environment (development/production) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `LINKEDIN_LI_AT` | Yes | LinkedIn `li_at` session cookie |
+| `LINKEDIN_JSESSIONID` | Yes | LinkedIn `JSESSIONID` cookie (numeric part only) |
+| `LINKEDIN_EMAIL` | No | LinkedIn email — needed only for auto-login (`npm run login`) |
+| `LINKEDIN_PASSWORD` | No | LinkedIn password — needed only for auto-login |
+| `PORT` | No | Server port (default: `3001`) |
+| `NODE_ENV` | No | `development` or `production` |
 
 ## API Endpoints
 
-### GET /health
-Health check endpoint.
+### `GET /health`
 
-**Response:**
+Health check.
+
 ```json
-{
-  "status": "ok",
-  "timestamp": "2026-08-30T12:00:00.000Z"
-}
+{ "status": "ok", "timestamp": "2026-08-30T12:00:00.000Z" }
 ```
 
-### GET /api/me
+### `GET /api/me`
+
 Returns the authenticated user's own profile.
 
-**Response:**
 ```json
 {
   "success": true,
-  "data": { ... }
+  "data": {
+    "publicIdentifier": "username",
+    "firstName": "John",
+    "lastName": "Doe",
+    "fullName": "John Doe",
+    "headline": "Software Engineer"
+  }
 }
 ```
 
-### GET /api/profile?url=<linkedin-url>
-Fetches a profile by URL.
+### `GET /api/profile?url=<linkedin-url>`
 
-**Example:**
+Fetches a profile by LinkedIn URL.
+
 ```
 /api/profile?url=https://www.linkedin.com/in/satyanadella
 ```
 
-**Response Schema:**
+### `GET /api/profile/:id`
+
+Fetches a profile by public identifier.
+
+```
+/api/profile/satyanadella
+```
+
+**Response schema** (both profile endpoints return this):
+
 ```json
 {
   "success": true,
   "profile": {
-    "id": "urn:li:person:...",
+    "id": "urn:li:fsd_profile:...",
     "publicIdentifier": "satyanadella",
-    "name": {
-      "firstName": "Satya",
-      "lastName": "Nadella",
-      "fullName": "Satya Nadella"
-    },
+    "name": { "firstName": "Satya", "lastName": "Nadella", "fullName": "Satya Nadella" },
     "headline": "Chairman and CEO at Microsoft",
     "location": "Redmond, Washington, United States",
     "countryCode": "US",
     "about": "...",
-    "summary": "...",
-    "occupation": "...",
-    "currentPosition": { ... },
     "avatarUrl": "https://media.licdn.com/dms/image/...",
     "bannerUrl": "https://media.licdn.com/dms/image/...",
     "followersCount": 12345678,
     "connectionsCount": "500+",
-    "experience": [
-      {
-        "title": "Chairman and CEO",
-        "companyName": "Microsoft",
-        "startTime": "2014-02-01T00:00:00Z",
-        "endTime": null,
-        "location": "Redmond, WA",
-        "employmentType": "fullTime",
-        "description": "..."
-      }
-    ],
-    "education": [
-      {
-        "schoolName": "University of Wisconsin-Milwaukee",
-        "degree": "MBA",
-        "fieldOfStudy": "...",
-        "startTime": "...",
-        "endTime": "..."
-      }
-    ],
-    "skills": [
-      { "name": "Cloud Computing" },
-      { "name": "Strategy" }
-    ],
-    "certifications": [
-      {
-        "title": "Certification Name",
-        "authority": "Issuing Organization",
-        "startTime": "...",
-        "endTime": "..."
-      }
-    ],
-    "languages": [
-      { "name": "English", "proficiency": "NATIVE_OR_BILINGUAL" }
-    ],
+    "experience": [{ "title": "...", "companyName": "...", "timePeriod": {...} }],
+    "education": [{ "schoolName": "...", "degreeName": "...", "fieldOfStudy": "..." }],
+    "skills": [{ "name": "Cloud Computing", "endorsementCount": 99 }],
+    "certifications": [{ "name": "...", "authority": "..." }],
+    "languages": [{ "name": "English", "proficiency": "NATIVE_OR_BILINGUAL" }],
+    "projects": [],
+    "patents": [],
+    "publications": [],
+    "honors": [],
+    "courses": [],
+    "volunteer": [],
+    "testScores": [],
+    "organizations": [],
     "contactInfo": {
       "emailAddress": "...",
-      "phoneNumbers": [...],
-      "websites": [...],
-      "twitter": "..."
+      "phoneNumbers": ["..."],
+      "websites": [{ "label": "...", "url": "..." }],
+      "twitterHandles": [...]
     }
   },
   "meta": {
     "fetchedAt": "2026-08-30T12:00:00.000Z",
-    "source": "linkedin-voyager-api",
+    "source": "linkedin-voyager-api-native",
     "identifier": "satyanadella"
   }
 }
 ```
 
-### GET /api/profile/:id
-Fetches a profile by public identifier (the part after `linkedin.com/in/`).
-
-**Example:**
-```
-/api/profile/satyanadella
-```
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `LINKEDIN_LI_AT` | LinkedIn session cookie (`li_at`) |
-| `LINKEDIN_JSESSIONID` | LinkedIn session cookie (`JSESSIONID`) |
-| `PORT` | Server port (default: 3000) |
-| `NODE_ENV` | Environment (development/production) |
-
-## Getting LinkedIn Credentials
-
-Use the built-in login helper instead of manually copying cookies:
-
-```bash
-npm run login
-```
-
-This opens a browser, lets you log in to LinkedIn, and automatically saves your session to `.env`.
-
 ## Deployment
 
 ### Railway (Recommended)
 
-1. Install Railway CLI: `npm i -g @railway/cli`
-2. Login: `railway login`
-3. Initialize project: `railway init`
-4. Set environment variables:
-   ```bash
-   railway variables set LINKEDIN_LI_AT="your_li_at"
-   railway variables set LINKEDIN_JSESSIONID="your_jsessionid"
-   ```
-5. Deploy: `railway up`
+```bash
+npm i -g @railway/cli
+railway login
+railway init
+railway variables set LINKEDIN_LI_AT="your_li_at"
+railway variables set LINKEDIN_JSESSIONID="your_jsessionid"
+railway up
+```
+
+Or push to GitHub and connect the repo at [railway.app/new](https://railway.app/new).
 
 ### Render
 
-1. Create a new **Web Service** on Render
-2. Connect your Git repository
+1. Create a new **Web Service** at [render.com/dashboard](https://dashboard.render.com)
+2. Connect your GitHub repo
 3. Set build command: `npm install`
 4. Set start command: `npm start`
-5. Add environment variables in the Render dashboard
+5. Add environment variables in the dashboard
 
 ### Fly.io
 
 ```bash
-fly launch
+fly launch --no-deploy
 fly secrets set LINKEDIN_LI_AT="your_li_at" LINKEDIN_JSESSIONID="your_jsessionid"
 fly deploy
 ```
 
-## Rate Limiting
+### Docker
 
-The API includes built-in rate limiting (20 requests/minute). Excessive use may trigger LinkedIn's anti-bot defenses. Use responsibly.
+```bash
+docker build -t linkedin-api .
+docker run -p 3000:3000 \
+  -e LINKEDIN_LI_AT=your_li_at \
+  -e LINKEDIN_JSESSIONID=your_jsessionid \
+  linkedin-api
+```
+
+## NPM Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm start` | Start the API server |
+
+
+## Important Notes
+
+- **Session cookies expire.** The server auto-refreshes using saved credentials, but you need `LINKEDIN_EMAIL` and `LINKEDIN_PASSWORD` set for that to work. Without them, you'll need to re-run `npm run login` manually when cookies expire.
+- **Rate limiting** is set to 20 requests/minute. Exceeding this will trigger a `429` response.
+- **LinkedIn may block accounts** that make unusual API traffic. Use responsibly and avoid high-volume scraping.
 
 ## Disclaimer
 
 This project uses LinkedIn's internal Voyager API, which is not officially documented or supported by LinkedIn. Use at your own risk. Excessive or improper use may result in account restrictions.
+
+## License
+
+MIT
