@@ -4,6 +4,8 @@ A REST API that accepts a LinkedIn profile URL and returns structured JSON data.
 
 **[Video Demo](https://drive.google.com/drive/folders/1W8QWRfgvCezrwW4T0W6s7MkyfSodIHsg?usp=drive_link)**
 
+**Base URL:** [https://linkedin-api.visheshxdevs.in](https://linkedin-api.visheshxdevs.in)
+
 ## How It Works
 
 ```
