@@ -20,6 +20,8 @@ Client  --->  Express Server  --->  LinkedIn Voyager API
 3. The raw Voyager response is parsed and normalized into a clean JSON structure — extracting name, headline, experience, education, skills, certifications, contact info, and more from the deeply nested response.
 4. If the session expires (HTTP 302), the server automatically re-authenticates using saved credentials and retries the request.
 
+> **No need to run `npm run login` manually.** On startup (and whenever cookies expire), the server automatically performs a headless login using your `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` credentials and saves the resulting `LINKEDIN_LI_AT` / `LINKEDIN_JSESSIONID` cookies to `.env`. The `npm run login` script is just an interactive fallback.
+
 ## Features
 
 - **No browser per request** — direct HTTP calls to Voyager API
@@ -67,19 +69,27 @@ npm install
 
 **Option A — Automatic (recommended):**
 
-Set your LinkedIn email and password, then run the login helper:
+Just set your LinkedIn email and password, then start the server — the login happens on startup, no separate command needed:
 
 ```bash
 # Set credentials in .env or as environment variables
 export LINKEDIN_EMAIL=your_email
 export LINKEDIN_PASSWORD=your_password
 
-npm run login
+npm start
 ```
 
-This opens a browser, logs in, captures session cookies, and saves them to `.env`.
+On startup the server opens a headless browser, logs in, captures the session cookies (`li_at` and `JSESSIONID`), and saves them to `.env` automatically — so you never have to set `JSESSIONID` by hand.
+
+> If LinkedIn triggers a CAPTCHA / 2FA challenge, the headless automatic login can't complete it. In that case, run the interactive login helper (opens a browser so you can verify manually):
+
+> ```bash
+> npm run login
+> ```
 
 **Option B — Manual:**
+
+If you prefer not to use auto-login, capture cookies yourself:
 
 1. Log in to LinkedIn in your browser
 2. Press `F12` → Application → Cookies → `https://www.linkedin.com`
@@ -91,6 +101,8 @@ LINKEDIN_LI_AT=your_li_at_value
 LINKEDIN_JSESSIONID=your_jsessionid_value
 ```
 
+Now you can start the server with `npm start`.
+
 ### 3. Start the server
 
 ```bash
@@ -100,7 +112,7 @@ npm start
 ### 4. Test it
 
 ```bash
-curl "http://localhost:3000/api/profile?url=https://www.linkedin.com/in/satyanadella"
+curl "http://localhost:3001/api/profile?url=https://www.linkedin.com/in/satyanadella"
 ```
 
 ## Environment Variables
@@ -252,7 +264,7 @@ docker run -p 3000:3000 \
 
 ## Important Notes
 
-- **Session cookies expire.** The server auto-refreshes using saved credentials, but you need `LINKEDIN_EMAIL` and `LINKEDIN_PASSWORD` set for that to work. Without them, you'll need to re-run `npm run login` manually when cookies expire.
+- **Session cookies expire.** The server detects this and, when they expire (HTTP 302), automatically re-authenticates in headless mode using your `LINKEDIN_EMAIL` / `LINKEDIN_PASSWORD` and retries the request. This happens automatically — no need to run `npm run login` again. If a CAPTCHA / 2FA challenge blocks headless login, use `npm run login` interactively instead.
 - **Rate limiting** is set to 20 requests/minute. Exceeding this will trigger a `429` response.
 - **LinkedIn may block accounts** that make unusual API traffic. Use responsibly and avoid high-volume scraping.
 
@@ -260,6 +272,4 @@ docker run -p 3000:3000 \
 
 This project uses LinkedIn's internal Voyager API, which is not officially documented or supported by LinkedIn. Use at your own risk. Excessive or improper use may result in account restrictions.
 
-## License
 
-MIT
